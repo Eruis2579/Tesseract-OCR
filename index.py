@@ -11,7 +11,8 @@ import re
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 image_path = 'table.png'
-excel_file = 'stealth_triggers.xlsx'
+excel_file = 'results.xlsx'
+previous_source_file = 'previous_source.xlsx'
 
 # Keep track of previously seen rows
 previous_rows = set()
@@ -21,10 +22,15 @@ header_saved = False
 if not os.path.exists(excel_file):
     wb = Workbook()
     ws = wb.active
-    ws.title = "OCR Data"
+    ws.title = "OCR Result Data"
     wb.save(excel_file)
+if not os.path.exists(previous_source_file):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "OCR Source Data"
+    wb.save(previous_source_file)
 else:
-    wb = load_workbook(excel_file)
+    wb = load_workbook(previous_source_file)
     ws = wb.active
     for i, row in enumerate(ws.iter_rows(values_only=True)):
         if i == 0:
@@ -145,6 +151,23 @@ def append_to_excel(header, data_rows):
     wb.save(excel_file)
     wb.close()
 
+def append_to_source_excel(header, data_rows):
+    global header_saved
+    print(header, "header")
+    print(data_rows, "data_rows")
+    wb = load_workbook(previous_source_file)
+    ws = wb.active
+
+    if not header_saved:
+        if ws.max_row == 1 and not any(ws.iter_rows(values_only=True)):
+            ws.append(header)
+        header_saved = True
+
+    for row in data_rows:
+        ws.append(row)
+
+    wb.save(previous_source_file)
+    wb.close()
 print("🔍 Watching for table updates... Press Ctrl+C to stop.")
 try:
     while True:
@@ -161,7 +184,7 @@ try:
             print(header, "222222")
             data_rows = table_data[2:]
             print(data_rows, "333333")
-
+            
             # Filter out rows already in Excel
             new_rows = []
             print(new_rows, "444444")
@@ -175,6 +198,7 @@ try:
 
             if new_rows:
                 append_to_excel(header, new_rows)
+                append_to_source_excel(header, new_rows)
                 img = highlight_new_rows(img, table_rows[1:], new_rows)
                 print(img, "777777")
 
