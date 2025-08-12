@@ -6,7 +6,8 @@ import time
 from datetime import datetime
 from openpyxl import Workbook, load_workbook
 import re
-
+import pygetwindow as gw
+import pyautogui
 # Optional if Tesseract is not in PATH
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -102,7 +103,7 @@ def ocr_table(image, rows):
             _, roi_thresh = cv2.threshold(roi_gray, 190, 255, cv2.THRESH_BINARY_INV)
             text = pytesseract.image_to_string(
                 roi_thresh,
-                config='--psm 6 -c tessedit_char_whitelist=0123456789.:+-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+                config='--psm 6 -c preserve_interword_spaces=1 -c tessedit_char_whitelist=0123456789.:+-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
             ).strip()
             # Clean SignalTime column (assume first column)
             if row_i > 0 and col_i == 0 and text:
@@ -141,11 +142,11 @@ def append_to_excel(header, data_rows):
         init_row = row[0].split()
         init_row[2] = init_row[2][:3] + "." + init_row[2][-3:]
         for i in range(4,len(init_row)):
-            if "o" in init_row[i]:
-                if(init_row[i][0] == "o"):
-                    init_row[i] = init_row[i].replace("o", "9.")
+            if "O" in init_row[i]:
+                if(init_row[i][0] == "O"):
+                    init_row[i] = init_row[i].replace("O", "0.")
                 else:
-                    init_row[i] = init_row[i].replace("o", "9")
+                    init_row[i] = init_row[i].replace("O", "0")
         ws.append(init_row[0:10])
 
     wb.save(excel_file)
@@ -168,45 +169,65 @@ def append_to_source_excel(header, data_rows):
 
     wb.save(previous_source_file)
     wb.close()
+
+def splitByIndex(string):
+    return " ".join(string.split()[:10])
+
 print("🔍 Watching for table updates... Press Ctrl+C to stop.")
 try:
     while True:
-        if os.path.exists(image_path):
-            img = cv2.imread(image_path)
-            table_rows = extract_table(img)
-            table_data = ocr_table(img, table_rows)
-            print(table_data, "111111")
-            if not table_data:
-                time.sleep(5)
-                continue
+        windows = [w for w in gw.getWindowsWithTitle("Triggers List") if w.visible]
+        if not windows:
+            raise Exception("Triggers List window not found. Please open it and make sure it's visible.")
 
-            header = table_data[1]
-            print(header, "222222")
-            data_rows = table_data[2:]
-            print(data_rows, "333333")
+        stealth_win = windows[0]
+
+        # 2. Take a screenshot of the window
+        width = stealth_win.width
+        height = stealth_win.height
+        print(width, height)
+        bbox = (stealth_win.left, stealth_win.top, width, height)
+        screenshot = pyautogui.screenshot(region=bbox)
+
+        # Save full screenshot
+        full_screenshot_path = os.path.join(os.getcwd(), "table.png")
+        screenshot.save(full_screenshot_path)
+        print(f"📸 Full screenshot saved: {full_screenshot_path}")
+        img = cv2.imread(full_screenshot_path)
+        table_rows = extract_table(img)
+        table_data = ocr_table(img, table_rows)
+        print(table_data, "111111")
+        if not table_data:
+            time.sleep(5)
+            continue
+
+        header = table_data[1]
+        print(header, "222222")
+        data_rows = table_data[2:]
+        print(data_rows, "333333")
             
-            # Filter out rows already in Excel
-            new_rows = []
-            print(new_rows, "444444")
-            print(previous_rows, "555555")
-            for r in data_rows:
-                row_tuple = tuple(r)
-                if row_tuple not in previous_rows:
-                    previous_rows.add(row_tuple)
-                    new_rows.append(r)
+        # Filter out rows already in Excel
+        new_rows = []
+        print(new_rows, "444444")
+        print(previous_rows, "555555")
+        for r in data_rows:
+            row_tuple = (splitByIndex(tuple(r)[0]), tuple(r)[1])
+            if row_tuple not in previous_rows:
+                previous_rows.add(row_tuple)
+                new_rows.append(row_tuple)
             print(new_rows, "666666")
 
-            if new_rows:
-                append_to_excel(header, new_rows)
-                append_to_source_excel(header, new_rows)
-                img = highlight_new_rows(img, table_rows[1:], new_rows)
-                print(img, "777777")
+        if new_rows:
+            append_to_excel(header, new_rows)
+            append_to_source_excel(header, new_rows)
+            # img = highlight_new_rows(img, table_rows[1:], new_rows)
+            # print(img, "777777")
 
-            cv2.imshow("OCR Table Monitor", img)
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
+        # cv2.imshow("OCR Table Monitor", img)
+        # if cv2.waitKey(1) & 0xFF == 27:
+        #     break
 
-        time.sleep(5)
+        time.sleep(10)
 
 except KeyboardInterrupt:
     print("\n🛑 Stopped by user.")
