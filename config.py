@@ -1,0 +1,16 @@
+XLSX_PATH = "results.xlsx"
+TICK_PATH = "tick_size.xlsx"
+SD_CLEANED_PATH = "results_cleaned.xlsx"
+
+TICK_UPDATE_INTERVAL = 120  # seconds
+
+#ibkr
+IB_PORT = 7497
+IB_CLIENT_ID = 123
+IB_HOST = "127.0.0.1"
+IB_DRY_RUN = True
+IB_USE_PAPER = True
+IB_MAX_ORDERS_PER_SIGNAL = 15
+IB_DEFAULT_WAIT_SD = 0.0
+IB_TRAILING_MODE = "OFF"
+IB_ONE_PERCENT_STOP = True
